@@ -139,9 +139,11 @@ impl AssetDriver for CxtaDriver {
         let png_data = &data[offset..offset + png_len];
         offset += png_len;
 
-        let atlas = ImageReader::new(io::Cursor::new(png_data))
-            .with_guessed_format()?
-            .decode()
+        let mut reader = ImageReader::new(io::Cursor::new(png_data))
+            .with_guessed_format()?;
+        reader.no_limits();
+
+        let atlas = reader.decode()
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
             .into_rgba8();
 
