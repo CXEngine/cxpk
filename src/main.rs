@@ -6,8 +6,8 @@ mod driver;
 mod packer;
 
 mod cxan;
-mod cxsi;
 mod cxmp;
+mod cxsi;
 mod cxta;
 
 use packer::CXPK_MAGIC;
@@ -27,22 +27,24 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    Pack {
-        dir: PathBuf,
-        out: PathBuf,
-    },
-    Unpack {
-        input: PathBuf,
-        dir: PathBuf,
-    },
+    Pack { dir: PathBuf, out: PathBuf },
+    Unpack { input: PathBuf, dir: PathBuf },
 }
 
 fn pack(assets_dir: &Path, output_file: &Path, max_jobs: usize) -> io::Result<()> {
     if !assets_dir.exists() {
-        return Err(io::Error::new(io::ErrorKind::NotFound, format!("Assets directory '{}' not found", assets_dir.display())));
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Assets directory '{}' not found", assets_dir.display()),
+        ));
     }
 
-    println!("Packing assets from {} to {}... ({} workers)", assets_dir.display(), output_file.display(), max_jobs);
+    println!(
+        "Packing assets from {} to {}... ({} workers)",
+        assets_dir.display(),
+        output_file.display(),
+        max_jobs
+    );
 
     let files = packer::process_directory(assets_dir, max_jobs)?;
     println!("Found {} files to pack", files.len());
@@ -54,7 +56,10 @@ fn pack(assets_dir: &Path, output_file: &Path, max_jobs: usize) -> io::Result<()
     for (name, data) in &files {
         let size = data.len() as u64;
         if size > (u32::MAX as u64) {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, format!("File '{}' is too large", name)));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("File '{}' is too large", name),
+            ));
         }
         entries.push((name.clone(), current_offset as u32, size as u32));
         current_offset += size;
@@ -85,10 +90,17 @@ fn pack(assets_dir: &Path, output_file: &Path, max_jobs: usize) -> io::Result<()
 
 fn unpack(input_file: &Path, output_dir: &Path) -> io::Result<()> {
     if !input_file.exists() {
-         return Err(io::Error::new(io::ErrorKind::NotFound, format!("Input file '{}' not found", input_file.display())));
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Input file '{}' not found", input_file.display()),
+        ));
     }
 
-    println!("Unpacking container {} to {}...", input_file.display(), output_dir.display());
+    println!(
+        "Unpacking container {} to {}...",
+        input_file.display(),
+        output_dir.display()
+    );
     packer::unpack_container(input_file, output_dir)?;
     println!("Successfully unpacked to {}", output_dir.display());
     Ok(())

@@ -46,9 +46,7 @@ pub fn process_directory(assets_dir: &Path, threads: usize) -> io::Result<Vec<(S
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .map(|e| e.path().to_path_buf())
-        .filter(|path| {
-            !asset_folders.keys().any(|f| path.starts_with(f))
-        })
+        .filter(|path| !asset_folders.keys().any(|f| path.starts_with(f)))
         .collect();
 
     enum Job {
@@ -91,9 +89,7 @@ pub fn process_directory(assets_dir: &Path, threads: usize) -> io::Result<Vec<(S
     let results: Vec<io::Result<(String, Vec<u8>)>> = pool.install(|| {
         jobs.into_par_iter()
             .map(|job| match job {
-                Job::Asset(folder, name, idx) => {
-                    drivers[idx].pack(&folder).map(|d| (name, d))
-                }
+                Job::Asset(folder, name, idx) => drivers[idx].pack(&folder).map(|d| (name, d)),
                 Job::Raw(path, name) => fs::read(&path).map(|d| (name, d)),
             })
             .collect()
@@ -114,7 +110,10 @@ pub fn unpack_container(input_file: &Path, output_dir: &Path) -> io::Result<()> 
     let mut magic = [0u8; 4];
     file.read_exact(&mut magic)?;
     if &magic != CXPK_MAGIC {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid CXPK magic"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid CXPK magic",
+        ));
     }
 
     let mut count_bytes = [0u8; 4];
@@ -134,7 +133,7 @@ pub fn unpack_container(input_file: &Path, output_dir: &Path) -> io::Result<()> 
         let name = String::from_utf8_lossy(&name_bytes)
             .trim_matches('\0')
             .to_string();
-        
+
         let mut off_bytes = [0u8; 4];
         file.read_exact(&mut off_bytes)?;
         let offset = u32::from_le_bytes(off_bytes);
@@ -161,7 +160,11 @@ pub fn unpack_container(input_file: &Path, output_dir: &Path) -> io::Result<()> 
                 if entry.name.ends_with(driver.extension()) {
                     let folder_name = &entry.name[..entry.name.len() - driver.extension().len()];
                     let folder_path = output_dir.join(folder_name);
-                    println!("Unpacking asset: {} -> {}", entry.name, folder_path.display());
+                    println!(
+                        "Unpacking asset: {} -> {}",
+                        entry.name,
+                        folder_path.display()
+                    );
                     driver.unpack(&data, &folder_path)?;
                     unpacked = true;
                 }

@@ -3,7 +3,7 @@ use std::io;
 use std::path::Path;
 
 use image::io::Reader as ImageReader;
-use image::{GenericImage, RgbaImage, GenericImageView};
+use image::{GenericImage, GenericImageView, RgbaImage};
 use png;
 use rayon::prelude::*;
 use toml::Value;
@@ -133,10 +133,16 @@ impl AssetDriver for CxanDriver {
 
     fn unpack(&self, data: &[u8], folder: &Path) -> io::Result<()> {
         if data.len() < 24 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "CXAN data too short"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "CXAN data too short",
+            ));
         }
         if &data[0..4] != CXAN_MAGIC {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid CXAN magic"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid CXAN magic",
+            ));
         }
 
         let page_count = u16::from_le_bytes(data[4..6].try_into().unwrap()) as usize;
@@ -151,10 +157,16 @@ impl AssetDriver for CxanDriver {
         let mut current_pos = frame_map_offset;
         for _ in 0..frame_count {
             if current_pos + 4 > data.len() {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected end of CXAN data (frame map)"));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Unexpected end of CXAN data (frame map)",
+                ));
             }
-            let page_idx = u16::from_le_bytes(data[current_pos..current_pos+2].try_into().unwrap()) as usize;
-            let cell_idx = u16::from_le_bytes(data[current_pos+2..current_pos+4].try_into().unwrap()) as usize;
+            let page_idx =
+                u16::from_le_bytes(data[current_pos..current_pos + 2].try_into().unwrap()) as usize;
+            let cell_idx =
+                u16::from_le_bytes(data[current_pos + 2..current_pos + 4].try_into().unwrap())
+                    as usize;
             current_pos += 4;
             frame_map.push((page_idx, cell_idx));
         }
@@ -162,7 +174,10 @@ impl AssetDriver for CxanDriver {
         let mut page_to_frames: Vec<Vec<usize>> = vec![Vec::new(); page_count];
         for (f_idx, (p_idx, _c_idx)) in frame_map.iter().enumerate() {
             if *p_idx >= page_count {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid page index in frame map"));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid page index in frame map",
+                ));
             }
             page_to_frames[*p_idx].push(f_idx);
         }
@@ -171,31 +186,61 @@ impl AssetDriver for CxanDriver {
         let mut current_page_pos = pages_offset;
         for p_idx in 0..page_count {
             if current_page_pos + 20 > data.len() {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected end of CXAN data (pages)"));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Unexpected end of CXAN data (pages)",
+                ));
             }
-            if &data[current_page_pos..current_page_pos+4] != CXAP_MAGIC {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid CXAP magic"));
+            if &data[current_page_pos..current_page_pos + 4] != CXAP_MAGIC {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid CXAP magic",
+                ));
             }
-            let cols = u16::from_le_bytes(data[current_page_pos+4..current_page_pos+6].try_into().unwrap()) as usize;
-            let _rows = u16::from_le_bytes(data[current_page_pos+6..current_page_pos+8].try_into().unwrap()) as usize;
-            let fw = u32::from_le_bytes(data[current_page_pos+8..current_page_pos+12].try_into().unwrap());
-            let fh = u32::from_le_bytes(data[current_page_pos+12..current_page_pos+16].try_into().unwrap());
-            let png_len = u32::from_le_bytes(data[current_page_pos+16..current_page_pos+20].try_into().unwrap()) as usize;
+            let cols = u16::from_le_bytes(
+                data[current_page_pos + 4..current_page_pos + 6]
+                    .try_into()
+                    .unwrap(),
+            ) as usize;
+            let _rows = u16::from_le_bytes(
+                data[current_page_pos + 6..current_page_pos + 8]
+                    .try_into()
+                    .unwrap(),
+            ) as usize;
+            let fw = u32::from_le_bytes(
+                data[current_page_pos + 8..current_page_pos + 12]
+                    .try_into()
+                    .unwrap(),
+            );
+            let fh = u32::from_le_bytes(
+                data[current_page_pos + 12..current_page_pos + 16]
+                    .try_into()
+                    .unwrap(),
+            );
+            let png_len = u32::from_le_bytes(
+                data[current_page_pos + 16..current_page_pos + 20]
+                    .try_into()
+                    .unwrap(),
+            ) as usize;
             current_page_pos += 20;
 
             if current_page_pos + png_len > data.len() {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected end of CXAP PNG data"));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Unexpected end of CXAP PNG data",
+                ));
             }
             let png_data = &data[current_page_pos..current_page_pos + png_len];
             current_page_pos += png_len;
 
             if !page_to_frames[p_idx].is_empty() {
-                let mut reader = ImageReader::new(io::Cursor::new(png_data))
-                    .with_guessed_format()?;
-                
+                let mut reader =
+                    ImageReader::new(io::Cursor::new(png_data)).with_guessed_format()?;
+
                 reader.no_limits();
 
-                let atlas = reader.decode()
+                let atlas = reader
+                    .decode()
                     .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
                     .into_rgba8();
 
@@ -206,7 +251,9 @@ impl AssetDriver for CxanDriver {
 
                     let frame = atlas.view(x, y, fw, fh).to_image();
                     let frame_path = folder.join(format!("{:05}.png", f_idx));
-                    frame.save(frame_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+                    frame
+                        .save(frame_path)
+                        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
                 }
             }
             // atlas is dropped here, freeing memory
@@ -294,4 +341,3 @@ fn load_png_frames(folder: &Path) -> io::Result<Vec<RgbaImage>> {
 
     Ok(frames)
 }
-

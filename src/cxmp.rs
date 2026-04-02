@@ -4,7 +4,7 @@ use std::mem;
 use std::path::Path;
 
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::driver::AssetDriver;
 
@@ -13,9 +13,15 @@ pub struct CxmpDriver;
 pub const CXMP_MAGIC: &[u8; 4] = b"CXMP";
 
 impl AssetDriver for CxmpDriver {
-    fn magic(&self) -> &[u8; 4] { CXMP_MAGIC }
-    fn extension(&self) -> &str { ".cxmp" }
-    fn entry_file(&self) -> &str { "map.entry" }
+    fn magic(&self) -> &[u8; 4] {
+        CXMP_MAGIC
+    }
+    fn extension(&self) -> &str {
+        ".cxmp"
+    }
+    fn entry_file(&self) -> &str {
+        "map.entry"
+    }
 
     fn pack(&self, folder: &Path) -> io::Result<Vec<u8>> {
         pack_map_cxmp(folder)
@@ -23,11 +29,17 @@ impl AssetDriver for CxmpDriver {
 
     fn unpack(&self, data: &[u8], folder: &Path) -> io::Result<()> {
         if data.len() < mem::size_of::<TdmpHeader>() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "CXMP data too short"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "CXMP data too short",
+            ));
         }
         let header = unsafe { &*(data.as_ptr() as *const TdmpHeader) };
         if &header.magic != b"CXMP" {
-             return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid CXMP magic"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid CXMP magic",
+            ));
         }
 
         fs::create_dir_all(folder)?;
@@ -42,7 +54,7 @@ impl AssetDriver for CxmpDriver {
             for tx in 0..header.tiles_x {
                 let offset = tile_idx * tile_size * tile_size * 4;
                 let tile_pixels = &pixel_data[offset..offset + tile_size * tile_size * 4];
-                
+
                 for y in 0..tile_size as u32 {
                     for x in 0..tile_size as u32 {
                         let sx = tx * header.tile_size as u32 + x;
@@ -57,7 +69,8 @@ impl AssetDriver for CxmpDriver {
                 tile_idx += 1;
             }
         }
-        img.save(folder.join("texture.png")).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        img.save(folder.join("texture.png"))
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
         // Reconstruct hitboxes
         let mut objects = Vec::new();
@@ -75,7 +88,7 @@ impl AssetDriver for CxmpDriver {
 
         let tile_table_data = &data[header.tile_table_offset as usize..];
         let tile_table = unsafe {
-             std::slice::from_raw_parts(
+            std::slice::from_raw_parts(
                 tile_table_data.as_ptr() as *const TileEntry,
                 header.tile_count as usize,
             )
@@ -89,9 +102,15 @@ impl AssetDriver for CxmpDriver {
                 let h = &hitboxes[(entry.first_hitbox + i) as usize];
                 let gx = h.x + tx;
                 let gy = h.y + ty;
-                
+
                 // Key for deduplication
-                let key = ( (gx * 100.0) as i32, (gy * 100.0) as i32, (h.w * 100.0) as i32, (h.h * 100.0) as i32, (h.rotation * 100.0) as i32 );
+                let key = (
+                    (gx * 100.0) as i32,
+                    (gy * 100.0) as i32,
+                    (h.w * 100.0) as i32,
+                    (h.h * 100.0) as i32,
+                    (h.rotation * 100.0) as i32,
+                );
                 if seen.insert(key) {
                     objects.push(json!({
                         "x": gx,
@@ -115,7 +134,10 @@ impl AssetDriver for CxmpDriver {
                 }
             ]
         });
-        fs::write(folder.join("hitboxes.json"), serde_json::to_string_pretty(&hitboxes_json).unwrap())?;
+        fs::write(
+            folder.join("hitboxes.json"),
+            serde_json::to_string_pretty(&hitboxes_json).unwrap(),
+        )?;
 
         // Reconstruct map.entry
         let entry_content = format!(
@@ -294,7 +316,8 @@ pub fn pack_map_cxmp(folder: &Path) -> io::Result<Vec<u8>> {
                             let w = obj.get("width").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
                             let h =
                                 obj.get("height").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-                             let rotation = obj.get("rotation").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                            let rotation =
+                                obj.get("rotation").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
                             global_hitboxes.push((x, y, w, h, rotation));
                         }
                     }
@@ -322,19 +345,9 @@ pub fn pack_map_cxmp(folder: &Path) -> io::Result<Vec<u8>> {
         let rad = rotation.to_radians();
         let c = rad.cos();
         let s = rad.sin();
-        
-        let x_coords = [
-            gx, 
-            gx + gw * c, 
-            gx + gw * c - gh * s, 
-            gx - gh * s
-        ];
-        let y_coords = [
-            gy, 
-            gy + gw * s, 
-            gy + gw * s + gh * c, 
-            gy + gh * c
-        ];
+
+        let x_coords = [gx, gx + gw * c, gx + gw * c - gh * s, gx - gh * s];
+        let y_coords = [gy, gy + gw * s, gy + gw * s + gh * c, gy + gh * c];
 
         let min_gx = x_coords.iter().fold(f32::INFINITY, |a, &b| a.min(b));
         let max_gx = x_coords.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
