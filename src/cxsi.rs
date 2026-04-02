@@ -112,6 +112,14 @@ impl AssetDriver for CxsiDriver {
             let png_data = &data[offset..offset + png_len];
             offset += png_len;
 
+            let mut reader = ImageReader::new(io::Cursor::new(png_data))
+                .with_guessed_format()?;
+            reader.no_limits();
+
+            let _img = reader.decode()
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+                .into_rgba8();
+
             let file_name = format!("variant_{:03}.png", i);
             fs::write(folder.join(&file_name), png_data)?;
             variants_toml.push(format!("{{ file = \"{}\" }}", file_name));
