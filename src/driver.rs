@@ -23,5 +23,6 @@ pub fn get_drivers() -> Vec<Box<dyn AssetDriver>> {
         Box::new(crate::cxan::CxanDriver),
         Box::new(crate::cxta::CxtaDriver),
         Box::new(crate::cxsi::CxsiDriver),
+        Box::new(crate::cxmp::CxmpDriver),
     ]
 }
